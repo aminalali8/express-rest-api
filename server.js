@@ -17,9 +17,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const db = require("./app/models");
+const runSeeders = require("./app/seeders");
+
 const retryMaxCount = 10;
 const retryInterval = 5;
-dbSyncWithRetry(retryMaxCount, retryInterval, db);
+
 // simple to understand retry function for connecting to the database
 function dbSyncWithRetry(maxRetries, sleepTime, db) {
   function sleep(ms) {
@@ -31,24 +33,28 @@ function dbSyncWithRetry(maxRetries, sleepTime, db) {
       throw err;
     }
     console.log(`Could not connect to database, waiting for ${sleepTime} seconds. ${maxRetries - 1} retries left`);
-    await sleep(sleepTime * 1000); // Sleeps for 2 seconds
+    await sleep(sleepTime * 1000);
 
     return dbSyncWithRetry(maxRetries - 1, sleepTime, db);
   }
 
-  return db.sequelize.sync().catch(handleError);
+  return db.sequelize.sync({ force: true })
+    .then(() => {
+      console.log("Database synced successfully");
+      return runSeeders();
+    })
+    .catch(handleError);
 }
-// // drop the table if it already exists
-// db.sequelize.sync({ force: true }).then(() => {
-//   console.log("Drop and re-sync db.");
-// });
+
+// Initialize database and run seeders
+dbSyncWithRetry(retryMaxCount, retryInterval, db);
 
 // simple route
 app.get("/", (req, res) => {
-  res.json({ message: "Welcome to Bunnyshell - Getting Started app" });
+  res.json({ message: "Welcome to My App" });
 });
 
-require("./app/routes/bunnystart.routes")(app);
+require("./app/routes/article.routes")(app);
 
 // set port, listen for requests
 const PORT = process.env.PORT || 3080;
